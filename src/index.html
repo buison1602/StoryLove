@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tình iu của e và c Thanh</title>
+  <meta name="description" content="A sweet flipbook gallery to gift someone special. One file, no libraries." />
+  <style>
+    :root{
+      --bg1:#fde2e4; /* soft blush */
+      --bg2:#cde9ff; /* pastel blue */
+      --ink:#2b2d42;
+      --accent:#ff477e; /* pink */
+      --paper:#fffaf7;
+      --shadow:0 20px 60px rgba(0,0,0,.18);
+      --radius:22px;
+    }
+
+    /* --- Page basics --- */
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+      color:var(--ink);
+      background: radial-gradient(1200px 800px at 10% -10%, rgba(255,71,126,.12), transparent),
+                  radial-gradient(1000px 700px at 110% 10%, rgba(75,132,255,.12), transparent),
+                  linear-gradient(135deg, var(--bg1), var(--bg2));
+      display:grid;
+      place-items:center;
+      overflow-x:hidden;
+    }
+
+    /* --- App frame --- */
+    .wrap{ width:min(92vw, 980px); padding:18px; }
+
+    .header{
+      display:flex; align-items:center; justify-content:space-between; gap:16px;
+      margin-bottom:12px;
+    }
+    .title{
+      display:flex; align-items:center; gap:10px; font-weight:700; letter-spacing:.3px;
+    }
+    .title .heart{ width:18px; height:18px; display:inline-block; position:relative; }
+    .title .heart::before, .title .heart::after{
+      content:""; position:absolute; width:55%; height:85%; background:var(--accent); border-radius:10px 10px 0 0; top:19%; left:21%; transform:rotate(-45deg);
+      box-shadow: 0 3px 10px rgba(255,71,126,.4);
+    }
+    .title .heart::after{ left:auto; right:21%; transform:rotate(45deg); }
+
+    .controls{
+      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    }
+    .btn{
+      appearance:none; border:0; background:rgba(255,255,255,.7); color:var(--ink);
+      padding:10px 14px; border-radius:999px; font-weight:600; cursor:pointer;
+      box-shadow: 0 6px 20px rgba(0,0,0,.08);
+      transition:.2s transform,.2s box-shadow,.2s background;
+      backdrop-filter: blur(6px);
+    }
+    .btn:hover{ transform:translateY(-1px); box-shadow: 0 10px 26px rgba(0,0,0,.12)}
+    .btn:active{ transform:translateY(0)}
+    .btn--primary{ background:var(--accent); color:white }
+
+    /* --- Book --- */
+    .stage{
+      position:relative; width:100%; aspect-ratio: 3/2; /* adjusts height responsively */
+      perspective: 2200px; border-radius: var(--radius);
+      filter: drop-shadow(var(--shadow));
+    }
+
+    .book{
+      position:absolute; inset:0; border-radius: var(--radius); overflow:visible;
+    }
+
+    /* Each .page is one photo card that can flip forward/back like a book page */
+    .page{
+      --i: 0; /* index set by JS */
+      position:absolute; inset:0; transform-style:preserve-3d; transform-origin:left center;
+      transition: transform 800ms cubic-bezier(.19,.84,.44,1);
+      border-radius: var(--radius);
+    }
+
+    /* subtle paper look */
+    .side{
+      position:absolute; inset:0; backface-visibility:hidden; border-radius: var(--radius);
+      box-shadow: 0 10px 30px rgba(0,0,0,.12);
+      overflow:hidden; background:var(--paper);
+      display:flex; align-items:center; justify-content:center;
+    }
+
+    /* cho ảnh hiển thị toàn bộ, không cắt */
+    .front{ background:#111; }                /* nền tối (đổi màu tùy thích) */
+    .front img{ 
+    width:100%; 
+    height:100%; 
+    object-fit:contain;                     /* quan trọng: fit theo khung */
+    display:block; 
+    image-rendering:auto;                   /* không vỡ hạt */
+    }
+    /* .back không dùng ảnh nên không cần .back img */
+
+    /* mặt trước đã có */
+    .front { background:#111; }
+    .front img { width:100%; height:100%; object-fit:contain; display:block; }
+
+    /* thêm cho mặt sau */
+    .back  { background:#111; }              /* thay gradient bằng nền tối */
+    .back img { width:100%; height:100%; object-fit:contain; display:block; }
+
+
+    .front .pageNum, .back .pageNum{
+      position:absolute; bottom:10px; right:14px; background:rgba(0,0,0,.4); color:#fff; font-size:12px; padding:4px 8px; border-radius:999px;
+    }
+
+    /* The "back" of the page (when flipped) shows a soft gradient so it feels like paper backside. */
+    .back{
+      transform: rotateY(180deg);
+      background: radial-gradient(120% 100% at 0% 0%, #fff5f1 0%, #ffe9fd 60%, #f6f9ff 100%);
+      display:grid; place-items:center;
+    }
+    .back .backnote{ position:absolute; bottom:18px; left:16px; font-size:12px; opacity:.6 }
+
+    /* When a page is flipped, rotate it and push it slightly so shadows feel natural. */
+    .page.flipped{ transform: translateZ(-1px) rotateY(-180deg); }
+
+    /* Nav arrows */
+    .nav{
+      position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; pointer-events:none;
+    }
+    .nav .arrow{
+      pointer-events:auto; width:54px; height:54px; display:grid; place-items:center; border-radius:50%; border:0; cursor:pointer; font-size:20px; font-weight:800;
+      background:rgba(255,255,255,.8); box-shadow: 0 8px 24px rgba(0,0,0,.15); backdrop-filter: blur(6px);
+      user-select:none; -webkit-user-select:none;
+      transition:.15s transform,.15s box-shadow;
+    }
+    .nav .arrow:hover{ transform:translateY(-1px); box-shadow: 0 12px 28px rgba(0,0,0,.18) }
+
+    /* Progress pill */
+    .progress{
+      position:absolute; bottom:14px; left:50%; transform:translateX(-50%);
+      background:rgba(0,0,0,.55); color:#fff; font-weight:600; letter-spacing:.4px;
+      padding:6px 10px; border-radius:999px; font-size:12px; box-shadow: 0 6px 18px rgba(0,0,0,.2);
+    }
+
+    /* Tap zones for mobile: left/right halves */
+    .tapzone{ position:absolute; top:0; bottom:0; width:50%; }
+    .tapzone.left{ left:0 } .tapzone.right{ right:0 }
+
+    /* Small helper banner when no images yet */
+    .empty{
+      width:100%; height:100%; border-radius:var(--radius); background:rgba(255,255,255,.7);
+      display:grid; place-items:center; text-align:center; padding:18px; backdrop-filter: blur(6px);
+    }
+    .empty h2{ margin:.2rem 0 .4rem; }
+    .empty p{ margin:.2rem 0 .8rem; opacity:.8 }
+
+    @media (max-width:600px){
+      .nav .arrow{ width:46px; height:46px }
+      .btn{ padding:9px 12px }
+    }
+
+    /* Thu nhỏ tổng thể để nhìn thoáng, vẫn responsive */
+    .stage { transform: scale(.92); transform-origin:center; }
+
+    /* Bố cục two-page spread */
+    .spread { position:absolute; inset:0; perspective:2200px; }
+    .sheet  { position:absolute; top:0; bottom:0; left:50%; width:50%;
+            transform-origin:left center; transform-style:preserve-3d;
+            transition: transform 800ms cubic-bezier(.19,.84,.44,1); }
+    .sheet.flipped { transform: rotateY(-180deg); }
+
+    /* Trang trái luôn nằm dưới (stack), không xoay */
+    .leftStack { position:absolute; top:0; bottom:0; right:50%; width:50%; }
+    .leftPage, .rightPage {
+    position:absolute; inset:0; border-radius:var(--radius);
+    box-shadow: 0 10px 30px rgba(0,0,0,.12); background:#111; overflow:hidden;
+    }
+    .leftPage  img, .rightPage img { width:100%; height:100%; object-fit:contain; display:block; }
+
+    /* Mặt trước/mặt sau của tờ bên phải (giống .side) */
+    .sheet .front, .sheet .back {
+    position:absolute; inset:0; backface-visibility:hidden; border-radius:var(--radius);
+    background:#111; display:flex; align-items:center; justify-content:center; overflow:hidden;
+    }
+    .sheet .back { transform: rotateY(180deg); }
+    .gutter { position:absolute; top:0; bottom:0; left:calc(50% - 2px); width:4px; background:rgba(0,0,0,.25); border-radius:4px; }
+
+    .audio-wrap{
+        width:min(92vw, 980px);
+        margin:14px auto 0;
+        display:flex; align-items:center; gap:10px;
+        background:rgba(255,255,255,.7);
+        padding:10px 14px;
+        border-radius:999px;
+        box-shadow: 0 6px 20px rgba(0,0,0,.08);
+        backdrop-filter: blur(6px);
+    }
+    #audioBox{
+        width:100%;
+        height:36px; /* gọn gàng như “audio box” */
+    }
+
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <div class="title">
+        <span class="heart" aria-hidden="true"></span>
+        <span>Tình iu của e và c Thanh</span>
+      </div>
+      <div class="controls">
+        <button class="btn" id="chooseBtn">Choose photos</button>
+        <button class="btn" id="shuffleBtn" title="Shuffle order">Shuffle</button>
+        <button class="btn" id="fullscreenBtn" title="Fullscreen">Fullscreen</button>
+        <button class="btn btn--primary" id="startBtn" title="Start from first photo">Start</button>
+      </div>
+    </div>
+
+    <div class="stage" id="stage">
+        <div class="book spread" id="book">
+            <div class="leftStack" id="leftStack"></div>
+            <div class="gutter"></div>
+        <!-- Các .sheet (tờ bên phải) sẽ được JS thêm vào đây -->
+        </div>
+
+      <div class="nav" id="nav" hidden>
+        <button class="arrow" id="prev" aria-label="Previous">&#8249;</button>
+        <div class="progress" id="progress">1 / 1</div>
+        <button class="arrow" id="next" aria-label="Next">&#8250;</button>
+      </div>
+
+      <!-- tap zones for mobile -->
+      <div class="tapzone left" id="zoneLeft" hidden></div>
+      <div class="tapzone right" id="zoneRight" hidden></div>
+
+      <!-- <div class="empty" id="emptyState">
+        <div>
+          <h2>Make a flipbook for someone special 💖</h2>
+          <p>Click <strong>Choose photos</strong> to load a folder or select multiple pictures.<br>Or edit the code to add image paths in the <code>images</code> array.</p>
+          <button class="btn btn--primary" id="chooseBtn2">Choose photos</button>
+        </div>
+      </div> -->
+    </div>
+
+    <div class="audio-wrap">
+        <audio id="audioBox" controls preload="metadata">
+            <!-- nhiều source để tăng tương thích -->
+            <source src="videos/9.mp4" type="audio/mp4">
+            <source src="videos/9.mp4" type="video/mp4">
+        </audio>
+
+        <!-- nút option: bật/tắt lặp -->
+        <button class="btn" id="audioLoop">Loop</button>
+    </div>
+
+    <!-- hidden file input (supports picking a folder on Chromium via webkitdirectory) -->
+    <input type="file" id="filePicker" accept="image/*" multiple hidden webkitdirectory />
+
+    <!-- Optional: sweet background music (replace song.mp3 with your own). Browsers block autoplay, so it only plays after a click.) -->
+    <audio id="music" src="song.mp3" preload="none"></audio>
+  </div>
+
+  <script>
+    // =======================
+    
+    // =======================
+    
+    const images = [
+  "images/0.jpg",
+  "images/025e384d-c46c-422c-ba6b-66ccd6456f10 (1).jfif",
+  "images/025e384d-c46c-422c-ba6b-66ccd6456f10.jfif",
+  "images/04525c00-c012-4a07-a421-57665abead39.jfif",
+  "images/07083905-a4f3-44a3-94dd-bbf1eefa6bc4 (1).jfif",
+  "images/07083905-a4f3-44a3-94dd-bbf1eefa6bc4.jfif",
+  "images/09dc9596-7794-496a-a2b3-cf2535a69a98.jfif",
+  "images/1.jfif",
+  "images/11f3162f-9672-4d4e-b185-a010f6a60134 (1).jfif",
+  "images/11f3162f-9672-4d4e-b185-a010f6a60134.jfif",
+  "images/16ade016-14ad-4423-8b1a-ea5913584a25 (1).jfif",
+  "images/16ade016-14ad-4423-8b1a-ea5913584a25.jfif",
+  "images/16ddef34-2436-44c5-af08-1b0204acd2a8.jfif",
+  "images/18a501c4-53ca-44de-9a58-70c8d2044392.jfif",
+  "images/18f26d92-3c4a-46e8-bc4a-13c4c0c127ad (1).jfif",
+  "images/18f26d92-3c4a-46e8-bc4a-13c4c0c127ad.jfif",
+  "images/2.jfif",
+  "images/21a31789-5937-4831-9399-719bad663303.jfif",
+  "images/223d2964-ae1a-443b-aa6f-8993149f6f98.jfif",
+  "images/22ab0365-b00a-4b68-9eda-de3931a895e6.jfif",
+  "images/268ee01f-ac24-49f0-b53d-10c186addd63.jfif",
+  "images/3.jfif",
+  "images/3775de42-22e0-460a-a2f0-192c9d5832f3.jfif",
+  "images/381452d1-a88b-4542-a1ad-8d7414d15081 (1).jfif",
+  "images/381452d1-a88b-4542-a1ad-8d7414d15081 (2).jfif",
+  "images/381452d1-a88b-4542-a1ad-8d7414d15081.jfif",
+  "images/3c9527e5-8897-440b-a7fb-3e17d0191100.jfif",
+  "images/3cc182fd-140d-4da5-9f16-2b0f43b8b867 (1).jfif",
+  "images/3cc182fd-140d-4da5-9f16-2b0f43b8b867.jfif",
+  "images/3ccec082-83d9-46ed-8323-b7f15b61bef3.jfif",
+  "images/4.jfif",
+  "images/445deb71-a8e5-4184-bc17-298408bc0961.jfif",
+  "images/5.jfif",
+  "images/51f16085-cbc7-4c58-b0f8-5390404434b7.jfif",
+  "images/539ea06a-ecf4-44ae-a90b-1af8dc2e6912.jfif",
+  "images/55b472ed-98de-4f1b-a2f4-1fd27e815a22.jfif",
+  "images/5a0cdc54-3404-4013-9c3d-865ff6a6c58b.jfif",
+  "images/5b6f8553-67c0-49da-8118-103cb9e8b2ad.jfif",
+  "images/6.jfif",
+  "images/6056323e-bb3d-4fbe-9dad-78aaaf1ca821.jfif",
+  "images/6063d46f-af6f-4253-a051-e8839bf235f6 (1).jfif",
+  "images/6063d46f-af6f-4253-a051-e8839bf235f6.jfif",
+  "images/60823a2e-1ce7-466b-97e7-c55252621570.jfif",
+  "images/620a3af4-5f81-4b74-ba33-e3da1e92bb46.jfif",
+  "images/66524af4-0f41-4ecc-b21d-546bcbc74f91.jfif",
+  "images/66d9bf68-b0e5-47b6-a8ef-1ebadf041f75.jfif",
+  "images/66e24654-73aa-4ad4-8581-2d824c71f099 (1).jfif",
+  "images/66e24654-73aa-4ad4-8581-2d824c71f099.jfif",
+  "images/6852d4d1-1144-455d-8bdb-c6a217740379.jfif",
+  "images/6956f94f-dc0f-43f9-9e3e-4a3b9eb03c4e.jfif",
+  "images/69d39a8d-df94-4483-8097-01df4af9b70b.jfif",
+  "images/7.jfif",
+  "images/702df182-f441-4409-890c-d84374b4e01c.jfif",
+  "images/73d9fdc0-8c8f-493e-902e-07d17c64759a.jfif",
+  "images/768f0763-f2e8-4e00-bdc1-aedf5ca514ab (1).jfif",
+  "images/768f0763-f2e8-4e00-bdc1-aedf5ca514ab.jfif",
+  "images/8.jfif",
+  "images/8663f02e-5641-4e94-8fd6-7306890294bd.jfif",
+  "images/8cf4b33b-b046-4b1a-8acb-cfffbe8569b5.jfif",
+  "images/9.jfif",
+  "images/90ab492f-3b21-43b8-a5b2-4752b380af94.jfif",
+  "images/96a662e8-83ef-43b7-92d0-f29e75737fb8.jfif",
+  "images/98826761-969a-48cb-8176-5385af39150c (1).jfif",
+  "images/98826761-969a-48cb-8176-5385af39150c.jfif",
+  "images/9a6a3cee-c667-4fd1-95b1-fba5c8b6df53.jfif",
+  "images/9db55e76-855f-41d8-ae20-e36ef258035c (1).jfif",
+  "images/9db55e76-855f-41d8-ae20-e36ef258035c.jfif",
+  "images/a0ae7035-ad6c-4ab3-ae77-f4ac335a5ca5.jfif",
+  "images/a5301b21-f9fd-4262-909e-d0f5c14ee145.jfif",
+  "images/a61bf2cc-dc0f-43b6-a905-02580af8f0a8 (1).jfif",
+  "images/a61bf2cc-dc0f-43b6-a905-02580af8f0a8.jfif",
+  "images/a77a0f56-1ab8-4886-a15a-f0650da73b35.jfif",
+  "images/a883921e-75a0-476d-bda1-d709a15ace95.jfif",
+  "images/ab9dbdd5-8722-465b-ab20-a0581dca75aa.jfif",
+  "images/b09bb9d8-3e81-47b6-95df-29e8f242abb0 (1).jfif",
+  "images/b09bb9d8-3e81-47b6-95df-29e8f242abb0.jfif",
+  "images/b6635558-ebf0-4a23-87aa-9f550821508b.jfif",
+  "images/b8e21c8d-0f57-4dfa-b5fa-e69a885cfaf9.jfif",
+  "images/ba5583d8-8c3d-42cd-9a34-cf9d0acb2299 (1).jfif",
+  "images/ba5583d8-8c3d-42cd-9a34-cf9d0acb2299.jfif",
+  "images/be3aed4c-9fbd-4684-94d8-0c12fed88d9c.jfif",
+  "images/c1fd2f5e-ea78-4b2f-ba37-b7030e4b5fe3.jfif",
+  "images/c41a764d-29e2-4c1c-988e-7329e6bd8ff2.jfif",
+  "images/c57ce7a8-a938-455b-babd-7656d63b9cfd.jfif",
+  "images/c9cba8f6-29cb-4217-a713-e8c714906aad (1).jfif",
+  "images/c9cba8f6-29cb-4217-a713-e8c714906aad.jfif",
+  "images/ca36f70b-4793-4cc6-b37b-9d8ee179d710 (1).jfif",
+  "images/ca36f70b-4793-4cc6-b37b-9d8ee179d710 (2).jfif",
+  "images/ca36f70b-4793-4cc6-b37b-9d8ee179d710.jfif",
+  "images/cbc2e998-74c5-4dd1-870c-9f5ae620c62f (1).jfif",
+  "images/cbc2e998-74c5-4dd1-870c-9f5ae620c62f (2).jfif",
+  "images/cbc2e998-74c5-4dd1-870c-9f5ae620c62f.jfif",
+  "images/d12febd9-82f8-459b-85bc-ccdc4851fae5.jfif",
+  "images/d5b26b77-eeb7-40fa-bf77-bf539887eaa6.jfif",
+  "images/d6774dc5-e856-48bf-b37d-a04a9303f9d3.jfif",
+  "images/d953b7dd-e980-4c1c-87d3-18211d90304d.jfif",
+  "images/da3bc890-1582-4212-ad98-868c14921bb9.jfif",
+  "images/dae73591-9a1a-4234-a3d8-c44920622c5b.jfif",
+  "images/dcbfd961-9abb-4b04-99a8-c7e6a5e50efc.jfif",
+  "images/dfc17edd-57b7-4c39-adce-9442d3b81731.jfif",
+  "images/dffb7aea-21a2-49c0-aa3d-5e10adf635e3.jfif",
+  "images/e60a704d-50a8-4b98-b471-a04c70281ad2.jfif",
+  "images/e9ee7823-69a4-4535-be1a-7d8f26ad1805 (1).jfif",
+  "images/e9ee7823-69a4-4535-be1a-7d8f26ad1805.jfif",
+  "images/eae4c747-dc74-4a58-9b65-8e2adcbe44bc (1).jfif",
+  "images/eae4c747-dc74-4a58-9b65-8e2adcbe44bc.jfif",
+  "images/eb37f00e-9b2a-4d20-815f-509649974cbe.jfif",
+  "images/ebc4cfb0-5ea9-4ca4-a643-8771b3ccca25.jfif",
+  "images/ed93995e-775c-4e27-8cb4-d81ffadff762.jfif",
+  "images/eec27cdc-a3eb-469e-8ade-6b297d4f9ae6.jfif",
+  "images/ef02a4e9-f4d6-45b1-b198-84a187c53c82.jfif",
+  "images/f0eea91b-9118-4ef4-9a05-cf255ffea047.jfif",
+  "images/f343b8cd-51d1-43bb-b0af-f5ce2d84dad0 (1).jfif",
+  "images/f343b8cd-51d1-43bb-b0af-f5ce2d84dad0.jfif",
+  "images/f51770ae-271e-4c58-a142-c3d0f853f74a.jfif",
+  "images/fb2cb303-e3f2-4a6c-a15a-9989927d06dd.jfif",
+  "images/fda9c488-b209-4a14-9177-0940766fb10f.jfif",
+  "images/fdfa2640-bd9d-4d57-9ea4-21c79e6d7697.jfif",
+  "images/fe6974b5-1ec5-4b0f-8b8c-0bfcd957ac7a.jfif",
+  "images/feb7fb49-176c-4a04-a389-a382e363210b.jfif",
+  "images/ffd9feb0-dfa9-4bcb-8680-a5a3b3b6016e.jfif"
+];
+
+    // Global state
+    let pages = [];        // array of page elements
+    let currentIndex = 0;  // how many pages have been flipped (0 = first page on top)
+    let total = 0;         // total number of photos
+
+    let sheets = [];       // các tờ bên phải
+    let leftPages = [];    // các trang trái (stack)
+    let spreadIndex = 0;   // đang ở tờ số mấy (0-based)
+    let sheetTotal = 0;
+
+    const bookEl = document.getElementById('book');
+    const navEl = document.getElementById('nav');
+    const progressEl = document.getElementById('progress');
+    // const emptyEl = document.getElementById('emptyState');
+    const zoneLeft = document.getElementById('zoneLeft');
+    const zoneRight = document.getElementById('zoneRight');
+
+    const nextBtn = document.getElementById('next');
+    const prevBtn = document.getElementById('prev');
+    const filePicker = document.getElementById('filePicker');
+    const chooseBtn = document.getElementById('chooseBtn');
+    // const chooseBtn2 = document.getElementById('chooseBtn2');
+    const startBtn = document.getElementById('startBtn');
+    const shuffleBtn = document.getElementById('shuffleBtn');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    const music = document.getElementById('music');
+
+    let currentSources = images.slice(); // lưu thứ tự hiện tại
+
+    // Audio box
+    const audioBox  = document.getElementById('audioBox');
+    const audioLoop = document.getElementById('audioLoop');
+    if (audioLoop && audioBox) {
+    audioLoop.addEventListener('click', () => {
+        audioBox.loop = !audioBox.loop;
+        audioLoop.textContent = audioBox.loop ? 'Loop ✓' : 'Loop';
+    });
+    }
+
+    // Khi bấm Start, phát audio (nếu muốn)
+    startBtn.addEventListener('click', () => {
+    if (!sheetTotal && !total) return;
+    try { audioBox?.play?.(); } catch {}
+    }, { capture: true });
+
+
+    function updateLeft() {
+        leftPages.forEach((el, i) => {
+            const show = (i === spreadIndex);
+            el.style.display = show ? 'block' : 'none';   // ẩn hẳn trang trái khác
+            el.style.zIndex  = show ? '1000' : '0';       // trang hiện hành nằm trên cùng
+        });
+    }
+
+
+    function goToStart(){
+    // mở sách về trang đầu (không trang nào lật)
+    pages.forEach((p, i) => {
+        p.classList.remove('flipped');
+        p.style.zIndex = (total - i);
+    });
+    currentIndex = 0;
+    updateProgress();
+    }
+
+    function goToEnd(){
+    // đưa sách tới trạng thái đã lật hết (đang ở trang cuối)
+    pages.forEach((p, i) => {
+        p.classList.add('flipped');
+        p.style.zIndex = (i + 1);
+    });
+    currentIndex = total - 1;
+    updateProgress();
+    }
+
+
+    chooseBtn.addEventListener('click', () => filePicker.click());
+    // chooseBtn2.addEventListener('click', () => filePicker.click());
+
+    filePicker.addEventListener('change', async (e) => {
+      const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
+      if (!files.length) return;
+      // Sort by name to keep natural order
+      files.sort((a,b) => a.name.localeCompare(b.name, undefined, {numeric:true, sensitivity:'base'}));
+      const urls = files.map(f => URL.createObjectURL(f));
+      buildBook(urls);
+    });
+
+    shuffleBtn.addEventListener('click', () => {
+      if (!total) return;
+      const order = pages.map(p => p.dataset.src);
+      for (let i = order.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [order[i], order[j]] = [order[j], order[i]];
+      }
+      buildBook(order);
+    });
+
+    startBtn.addEventListener('click', () => {
+      if (!total) return;
+      buildBook(pages.map(p => p.dataset.src)); // rebuild puts us back to start
+      try { music.play().catch(()=>{}); } catch {}
+    });
+
+    fullscreenBtn.addEventListener('click', () => {
+      const el = document.documentElement;
+      if (!document.fullscreenElement) {
+        el.requestFullscreen?.();
+      } else {
+        document.exitFullscreen?.();
+      }
+    });
+
+    nextBtn.addEventListener('click', next);
+    prevBtn.addEventListener('click', prev);
+    zoneRight.addEventListener('click', next);
+    zoneLeft.addEventListener('click', prev);
+
+    // Keyboard (arrows), and space for next
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ') { next(); }
+      else if (e.key === 'ArrowLeft') { prev(); }
+    });
+
+    // Basic swipe
+    let x0 = null;
+    document.getElementById('stage').addEventListener('touchstart', (e)=>{ x0 = e.touches[0].clientX; }, {passive:true});
+    document.getElementById('stage').addEventListener('touchend', (e)=>{
+      if(x0==null) return; const dx = e.changedTouches[0].clientX - x0; x0=null;
+      if (dx < -40) next(); else if (dx > 40) prev();
+    }, {passive:true});
+
+    function updateProgress(){
+  // hiển thị theo ảnh: đang ở ảnh thứ … / tổng …
+        const currentPhoto = Math.min(spreadIndex * 2 + 1, total);
+        progressEl.textContent = `${currentPhoto} / ${total}`;
+        prevBtn.disabled = false;
+        nextBtn.disabled = false;
+    }
+
+    function next(){
+  if (!sheetTotal) return;
+  if (spreadIndex >= sheetTotal - 1){
+    // đang ở tờ cuối → quay vòng về đầu (mở sách lại)
+    for (let i = 0; i < sheets.length; i++){
+      sheets[i].classList.remove('flipped');
+      sheets[i].style.zIndex = (sheetTotal - i);
+    }
+    spreadIndex = 0;
+    updateLeft();
+    updateProgress();
+    return;
+  }
+  const s = sheets[spreadIndex];
+  s.classList.add('flipped');
+  s.style.zIndex = (spreadIndex + 1);
+  spreadIndex++;
+  updateLeft();
+  updateProgress();
+}
+
+function prev(){
+  if (!sheetTotal) return;
+  if (spreadIndex <= 0){
+    // đang ở tờ đầu → nhảy về cuối (đã lật hết)
+    for (let i = 0; i < sheets.length; i++){
+      sheets[i].classList.add('flipped');
+      sheets[i].style.zIndex = (i + 1);
+    }
+    spreadIndex = sheetTotal - 1;
+    updateLeft();
+    updateProgress();
+    return;
+  }
+  spreadIndex--;
+  const s = sheets[spreadIndex];
+  s.classList.remove('flipped');
+  s.style.zIndex = (sheetTotal - spreadIndex);
+  updateProgress();
+}
+
+
+function buildBook(srcList){
+  // reset
+  document.getElementById('leftStack').innerHTML = '';
+  bookEl.querySelectorAll('.sheet').forEach(el => el.remove());
+  pages = []; sheets = []; leftPages = [];
+  total = srcList.length;
+  sheetTotal = Math.ceil(total / 2);
+  spreadIndex = 0;
+
+  if (!total){
+    // emptyEl.hidden = false;
+    navEl.hidden = true; 
+    zoneLeft.hidden = true; 
+    zoneRight.hidden = true;
+    updateProgress(); return;
+  }
+//   emptyEl.hidden = true;
+  navEl.hidden = false; zoneLeft.hidden = false; zoneRight.hidden = false;
+
+  // 1) Tạo stack TRANG TRÁI (luôn nhìn thấy)
+  for (let i = 0; i < sheetTotal; i++){
+    const leftImgSrc = srcList[i*2] || srcList[0];
+    const left = document.createElement('div');
+    left.className = 'leftPage';
+    left.style.zIndex = (sheetTotal - i);               // tờ trước nằm trên
+    const li = document.createElement('img');
+    li.src = leftImgSrc; li.alt = `Photo ${i*2 + 1}`;
+    left.appendChild(li);
+    document.getElementById('leftStack').appendChild(left);
+    left.style.display = (i === 0) ? 'block' : 'none';
+    leftPages.push(left);
+  }
+
+  // 2) Tạo CÁC TỜ bên phải (mỗi tờ có mặt trước & sau)
+  for (let i = 0; i < sheetTotal; i++){
+    const rightIndex = i*2 + 1;                        // ảnh cho trang phải (mặt trước)
+    const nextLeftIndex = (i+1)*2;                     // ảnh trái của tờ kế (mặt sau khi lật)
+
+    const sheet = document.createElement('div');
+    sheet.className = 'sheet';
+    sheet.style.zIndex = (sheetTotal - i);
+
+    // FRONT (trang phải của tờ hiện tại)
+    const front = document.createElement('div');
+    front.className = 'front';
+    const frImg = document.createElement('img');
+    frImg.src = srcList[rightIndex] || '';             // có thể undefined nếu lẻ ảnh
+    frImg.alt = `Photo ${rightIndex + 1}`;
+    front.appendChild(frImg);
+
+    // BACK (sau khi lật, sẽ lộ trang trái của tờ tiếp theo)
+    const back = document.createElement('div');
+    back.className = 'back';
+    const bkImg = document.createElement('img');
+    bkImg.src = srcList[nextLeftIndex] || '';          // nếu hết ảnh -> rỗng
+    bkImg.alt = `Photo ${nextLeftIndex + 1}`;
+    back.appendChild(bkImg);
+
+    sheet.appendChild(front);
+    sheet.appendChild(back);
+    bookEl.appendChild(sheet);
+    sheets.push(sheet);
+
+    // click vào tờ trên cùng để Next
+    sheet.addEventListener('click', () => { if (i === spreadIndex) next(); });
+  }
+
+  // trạng thái ban đầu: chưa tờ nào lật
+  for (let i = 0; i < sheets.length; i++){
+    sheets[i].classList.remove('flipped');
+    sheets[i].style.zIndex = (sheetTotal - i);
+  }
+  updateLeft(); 
+  updateProgress();
+}
+
+    // Initialize: either use hard-coded images[] or show empty state
+    if (images.length){ buildBook(images); } else { updateProgress(); }
+  </script>
+</body>
+</html>
